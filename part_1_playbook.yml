@@ -1,12 +1,12 @@
 ---
 - name: Setup after new install
-  hosts: homeserver1
+  hosts: proxmoxmain
   gather_facts: true
   become: true
 
   roles:
     - update_repo
-    - wifi_setup
+    # - wifi_setup
     - create_sudo_user
     - generate_ssh_localhost
     - basics
