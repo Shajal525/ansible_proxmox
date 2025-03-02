@@ -5,7 +5,7 @@
   become: true
 
   roles:
-    - laptop_lid_disable
+    #- laptop_lid_disable
     - add_user_to_proxmox
 
   tasks:
