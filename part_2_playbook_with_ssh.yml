@@ -7,6 +7,7 @@
   roles:
     #- laptop_lid_disable
     - add_user_to_proxmox
+    # - format_drive_for_vm   #WARNING! this will erase everything on the specified disk!!!
 
   tasks:
     - name: Restart after everything is done

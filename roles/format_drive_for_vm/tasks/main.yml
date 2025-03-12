@@ -1,0 +1,75 @@
+---
+- name: Create mount point directory
+  file:
+    path: "{{ mount_point }}"
+    state: directory
+    mode: '0755'
+
+- name: Ensure the device is not mounted
+  mount:
+    path: "{{ mount_point }}"
+    state: unmounted
+  ignore_errors: true
+
+- name: Remove all partitions from /dev/sdc
+  shell: |
+    wipefs -a {{ storage_device }}
+    echo -e "o\nw" | fdisk {{ storage_device }}
+  args:
+    executable: /bin/bash
+
+- name: Create a new primary partition using the entire disk
+  parted:
+    device: "{{ storage_device }}"
+    number: 1
+    state: present
+    part_start: "0%"
+    part_end: "100%"
+
+- name: Format the new partition as XFS
+  filesystem:
+    fstype: xfs
+    dev: "{{ storage_device }}1"
+    opts: -f
+
+- name: Get partition UUID
+  command: blkid -s UUID -o value {{ storage_device }}1
+  register: uuid_output
+  changed_when: false
+
+- name: Add entry to /etc/fstab
+  mount:
+    path: "{{ mount_point }}"
+    src: "UUID={{ uuid_output.stdout }}"
+    fstype: xfs
+    opts: defaults
+    state: present
+
+- name: Mount the partition
+  mount:
+    path: "{{ mount_point }}"
+    src: "UUID={{ uuid_output.stdout }}"
+    fstype: xfs
+    state: mounted
+
+- name: Set correct permissions for Proxmox
+  file:
+    path: "{{ mount_point }}"
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Add storage to Proxmox configuration
+  shell: |
+    pvesm add dir {{ proxmox_storage_name }} --path {{ mount_point }}
+  args:
+    executable: /bin/bash
+  register: pvesm_result
+  failed_when: pvesm_result.rc != 0 and 'already exists' not in pvesm_result.stderr
+  changed_when: pvesm_result.rc == 0
+
+- name: Enable the storage for VM disk images
+  shell: |
+    pvesm set {{ proxmox_storage_name }} --content images,rootdir,iso,backup,snippets
+  args:
+    executable: /bin/bash
